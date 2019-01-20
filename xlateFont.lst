@@ -1,0 +1,278 @@
+#[1]   xlateFont.asm
+    3                     
+    4                     ; **************************************************************************
+    5                     ;
+    6                     ; System Card V3.00 Patches to include Translate font (8x16)
+    7                     ;
+    8                     ; **************************************************************************
+    9                     
+   10           0001      JPN_SYSCARD     =       1
+   11                     
+   12                     
+   13           0000                      .bank   $0
+   14           0000                      .org    $0000
+   15                     
+   16           0001              .if     JPN_SYSCARD
+   17                     
+   18  00:0000                            .incbin "syscard3.pce.jpn"
+   19                     
+   20           C868      VERPTCH         =       $C868
+   21           C950      VERTGT          =       $C950
+   22           CDA0      VERORG          =       $CDA0
+   23                     
+   24           E060      FNTPTCH         =       $E060
+   25           F124      ORGTRGT         =       $F124
+   26           F129      FNTERR          =       $F129
+   27           FEC4      FNTORG0         =       $FEC4
+   28                     
+   29                             .else
+   42                             .endif
+   43                     
+   44           0001      VERBANK         =       1       ; Bank where version ID appears
+   45           0001      FONTBANK        =       1       ; We are putting the font code in Bank 1
+   46                     
+   47           00F8      _AL             =       $F8     ; input = SJIS code LSB
+   48           00F9      _AH             =       $F9     ; input = SJIS code MSB (or ASCII)
+   49           00FA      _BL             =       $FA     ; input = target buffer LSB
+   50           00FB      _BH             =       $FB     ; input = target buffer MSB
+   51           00FF      _DH             =       $FF     ; input = character set
+   52                                                     ; 0 = 16x16
+   53                                                     ; 1 = 12x12
+   54                                                     ; 2 = 8x16 (NEW !!)
+   55                                                     ; 3 = 8x12 (NEW !!)
+   56                     
+   57           00FC      BASEADDR_MSB    =       $FC
+   58           22BA      BANK_STORE      =       $22BA   ; syscard's EX_GETFNT puts old bank here
+   59           00EE      RET_CODE        =       $EE
+   60           00EC      SRCLOC          =       $EC
+   61           00EC      SRCLOC_L        =       $EC
+   62           00ED      SRCLOC_H        =       $ED
+   63                     
+   64                     
+   65           0000                      .bank   0
+   66           E060                      .org    FNTPTCH
+   67  00:E060  4C C4 FE                  JMP     FNTORG0
+   68                     
+   69           FEC4                      .org    FNTORG0
+   70  00:FEC4  A5 FF                     LDA     <_DH
+   71  00:FEC6  C9 02                     CMP     #$2             ; 0=16x16
+   72                                                             ; 1=12x12
+   73  00:FEC8  90 07                     BCC     NORMAL
+   74  00:FECA  C9 04                     CMP     #$4             ; 2=8x16
+   75                                                             ; 3=8x12
+   76  00:FECC  90 06                     BCC     BNKMAP
+   77  00:FECE  4C 29 F1                  JMP     FNTERR          ; other value
+   78                     
+   79  00:FED1  4C 24 F1  NORMAL:         JMP     ORGTRGT         ; original instruction
+   80                     
+   81  00:FED4  A9 C0     BNKMAP:         LDA     #$C0            ; Presumptive location where
+   82                                                             ; bank 1 will be mapped
+   83                     
+   84  00:FED6  85 FC                     STA     <BASEADDR_MSB   ; Store base addr
+   85                     
+   86  00:FED8  A5 FB                     LDA     <_BH            ; MSB of target buffer
+   87  00:FEDA  38                        SEC
+   88  00:FEDB  C9 C0                     CMP     #$C0            ; is it a conflict ?
+   89  00:FEDD  B0 13                     BCS     .ALTMAP
+   90                     
+   91  00:FEDF  43 40                     TMA6                    ; store old bank
+   92  00:FEE1  8D BA 22                  STA     BANK_STORE
+   93  00:FEE4  A9 01                     LDA     #FONTBANK       ; swap in FONT BANK
+   94  00:FEE6  53 40                     TAM6
+   95  00:FEE8  20 3F D8                  JSR     FNTORG1         ; our font routine
+   96  00:FEEB  AD BA 22                  LDA     BANK_STORE      ; swap original bank back in
+   97  00:FEEE  53 40                     TAM6
+   98  00:FEF0  80 15                     BRA     EXIT
+   99                     
+  100  00:FEF2  A9 60     .ALTMAP:        LDA     #$60            ; base location ($6000 range)
+  101  00:FEF4  85 FC                     STA     <BASEADDR_MSB
+  102                     
+  103  00:FEF6  43 08                     TMA3                    ; store old bank
+  104  00:FEF8  8D BA 22                  STA     BANK_STORE
+  105  00:FEFB  A9 01                     LDA     #FONTBANK       ; swap in FONT BANK
+  106  00:FEFD  53 08                     TAM3
+  107  00:FEFF  20 3F 78                  JSR     FNTORG1-$6000   ; our font routine
+  108  00:FF02  AD BA 22                  LDA     BANK_STORE      ; swap original bank back in
+  109  00:FF05  53 08                     TAM3
+  110                     
+  111  00:FF07            EXIT:
+  112  00:FF07  A5 EE                     LDA     <RET_CODE
+  113  00:FF09  60                        RTS
+  114                     
+  115                     
+  116                     ; **************************************************************************
+  117                     ;
+  118                     ; Now, add some identification information
+  119                     ;
+  120                     ; **************************************************************************
+  121                     
+  122                     ; This string is here so that games can check version ID
+  123                     ; to ensure that they don't try to run on a card without
+  124                     ; the functionality.  So, it's at a fixed location.
+  125                     ;
+  126                     ; It may be sufficient to check only the first two letters ('NU')
+  127                     ; 
+  128           0000                      .bank   0
+  129           FFAA                      .org    $FFAA
+  130  00:FFAA  4E 55 46                  .db     "NUFONT"
+       00:FFAD  4F 4E 54  
+  131                     
+  132                     ;
+  133                     ; Now, we patch the screen paint function to print out
+  134                     ; an additional identification string
+  135                     ;
+  136           0001                      .bank   VERBANK
+  137                     
+  138           C868                      .org    VERPTCH
+  139  01:C868  20 A0 CD                  JSR     VERORG
+  140                     
+  141           CDA0                      .org    VERORG
+  142                     
+  143  01:CDA0  20 50 C9                  JSR     VERTGT
+  144  01:CDA3  A9 AF                     LDA     #LOW(VERSTR)
+  145  01:CDA5  85 F8                     STA     <_AL
+  146  01:CDA7  A9 CD                     LDA     #HIGH(VERSTR)
+  147  01:CDA9  85 F9                     STA     <_AH
+  148  01:CDAB  20 50 C9                  JSR     VERTGT
+  149  01:CDAE  60                        RTS
+  150                     
+  151  01:CDAF  00        VERSTR:         .db     $00             ; color attribute
+  152  01:CDB0  13 0F                     .db     $13,$0f         ; x, y position on screen
+  153  01:CDB2  4E 55 46                  .db     "NUFONT 1.00"
+       01:CDB5  4F 4E 54  
+       01:CDB8  20 31 2E  
+       01:CDBB  30 30     
+  154  01:CDBD  FF                        .db     $ff             ; string end
+  155  01:CDBE  FF                        .db     $ff             ; string list end
+  156                     
+  157  01:CDBF            ENDVER:
+  158                     
+  159                     
+  160                     ; **************************************************************************
+  161                     ;
+  162                     ; The print function lives substantially in this bank and must be
+  163                     ; relocatable, as the target buffer's RAM location is not known
+  164                     ; until runtime (and this can't occupy the same bank)
+  165                     ;
+  166                     ; **************************************************************************
+  167                     
+  168           0001              .if     FONTBANK = VERBANK
+  169           0001                      .bank   FONTBANK        ; if same bank, just continue
+  170           CDBF                      .org    ENDVER
+  171                             .else
+  174                             .endif
+  175                     
+  176  01:CDBF            FONT1:          .incbin "font8x16.bin"
+  177  01:D3BF            FONT2:          .incbin "font8x12.bin"
+  178                     
+  179  01:D83F            FNTORG1:
+  180  01:D83F  A9 01                     LDA     #1
+  181  01:D841  85 EE                     STA     <RET_CODE       ; set presumptive error code
+  182                     
+  183  01:D843  A5 F9                     LDA     <_AH            ; ASCII will be stored in MSB
+  184  01:D845  C9 80     .CHK1:          CMP     #$80
+  185  01:D847  90 01                     BCC     .CHK2
+  186  01:D849  60                        RTS
+  187                     
+  188  01:D84A  C9 20     .CHK2:          CMP     #$20
+  189  01:D84C  B0 01                     BCS     .CHKOK
+  190  01:D84E  60                        RTS
+  191                     
+  192  01:D84F  64 EE     .CHKOK:         STZ     <RET_CODE       ; ASCII OK - not an error now
+  193                             
+  194  01:D851  38                        SEC                     ; set up new value range
+  195  01:D852  E9 20                     SBC     #$20
+  196  01:D854  85 F8                     STA     <_AL
+  197  01:D856  64 F9                     STZ     <_AH
+  198                     
+  199  01:D858  A5 FF                     LDA     <_DH
+  200  01:D85A  C9 02                     CMP     #$2             ; if 8x12 font, used different
+  201                                                             ; offset calculation
+  202  01:D85C  F0 30                     BEQ     .WID8X16
+  203                     
+  204  01:D85E  A5 F8                     LDA     <_AL
+  205  01:D860  85 EC                     STA     <SRCLOC_L       ; store temporarily
+  206  01:D862  A5 F9                     LDA     <_AH
+  207  01:D864  85 ED                     STA     <SRCLOC_H
+  208                     
+  209  01:D866  06 F8                     ASL     <_AL            ; _AX = _AX * 2
+  210  01:D868  26 F9                     ROL     <_AH
+  211                     
+  212  01:D86A  18                        CLC
+  213  01:D86B  A5 EC                     LDA     <SRCLOC_L
+  214  01:D86D  65 F8                     ADC     <_AL
+  215  01:D86F  85 F8                     STA     <_AL
+  216  01:D871  A5 ED                     LDA     <SRCLOC_H
+  217  01:D873  65 F9                     ADC     <_AH
+  218  01:D875  85 F9                     STA     <_AH            ; Now, _AX = (orig _AX) * 3
+  219                     
+  220  01:D877  06 F8                     ASL     <_AL            ; Now, _AX = (orig _AX) * 6
+  221  01:D879  26 F9                     ROL     <_AH
+  222                     
+  223  01:D87B  06 F8                     ASL     <_AL            ; Now, _AX = (orig _AX) * 12
+  224  01:D87D  26 F9                     ROL     <_AH
+  225                     
+  226  01:D87F  A9 BF                     LDA     #LOW(FONT2)     ; character width table
+  227  01:D881  85 EC                     STA     <SRCLOC_L
+  228  01:D883  A9 13                     LDA     #HIGH(FONT2) & $1F
+  229  01:D885  18                        CLC
+  230  01:D886  65 FC                     ADC     <BASEADDR_MSB   ; base address
+  231  01:D888  85 ED                     STA     <SRCLOC_H
+  232                     
+  233  01:D88A  A2 0C                     LDX     #$0C            ; loop setup - 12 pix tall
+  234  01:D88C  80 16                     BRA     ADD
+  235                     
+  236  01:D88E  A2 04     .WID8X16:       LDX     #4
+  237  01:D890  06 F8     .LOOP1:         ASL     <_AL            ; 16 bytes per character
+  238  01:D892  26 F9                     ROL     <_AH
+  239  01:D894  CA                        DEX
+  240  01:D895  D0 F9                     BNE     .LOOP1
+  241                     
+  242  01:D897  A9 BF                     LDA     #LOW(FONT1)     ; set up base address for font
+  243  01:D899  85 EC                     STA     <SRCLOC_L
+  244  01:D89B  A9 0D                     LDA     #HIGH(FONT1) & $1F
+  245  01:D89D  18                        CLC
+  246  01:D89E  65 FC                     ADC     <BASEADDR_MSB   ; add base memory offset
+  247  01:D8A0  85 ED                     STA     <SRCLOC_H
+  248                     
+  249  01:D8A2  A2 10                     LDX     #$10            ; loop setup - 16 pix tall
+  250                             
+  251  01:D8A4  18        ADD:            CLC                     ; add character offset to base
+  252  01:D8A5  A5 F8                     LDA     <_AL
+  253  01:D8A7  65 EC                     ADC     <SRCLOC_L
+  254  01:D8A9  85 EC                     STA     <SRCLOC_L
+  255  01:D8AB  A5 F9                     LDA     <_AH
+  256  01:D8AD  65 ED                     ADC     <SRCLOC_H
+  257  01:D8AF  85 ED                     STA     <SRCLOC_H
+  258                     
+  259  01:D8B1  A0 00                     LDY     #0
+  260  01:D8B3  B2 EC     .CPYLP:         LDA     [SRCLOC]        ; get byte
+  261  01:D8B5  91 FA                     STA     [_BL],Y
+  262  01:D8B7  C8                        INY
+  263  01:D8B8  62                        CLA                     ; right side is empty
+  264  01:D8B9  91 FA                     STA     [_BL],Y
+  265  01:D8BB  C8                        INY
+  266                     
+  267  01:D8BC  18                        CLC
+  268  01:D8BD  A5 EC                     LDA     <SRCLOC_L       ; increment font source pointer
+  269  01:D8BF  69 01                     ADC     #1
+  270  01:D8C1  85 EC                     STA     <SRCLOC_L
+  271  01:D8C3  A5 ED                     LDA     <SRCLOC_H
+  272  01:D8C5  69 00                     ADC     #0
+  273  01:D8C7  85 ED                     STA     <SRCLOC_H
+  274  01:D8C9  CA                        DEX
+  275  01:D8CA  D0 E7                     BNE     .CPYLP
+  276                     
+  277  01:D8CC  A5 FF                     LDA     <_DH
+  278  01:D8CE  C9 03                     CMP     #$3
+  279  01:D8D0  D0 09                     BNE     .RET
+  280                     
+  281  01:D8D2  A2 08                     LDX     #8              ; Need to fill remainder of buffer
+  282  01:D8D4  62                        CLA
+  283  01:D8D5  91 FA     .CPYLP2:        STA     [_BL],Y
+  284  01:D8D7  C8                        INY
+  285  01:D8D8  CA                        DEX
+  286  01:D8D9  D0 FA                     BNE     .CPYLP2
+  287                     
+  288  01:D8DB  60        .RET:           RTS
+  289                     

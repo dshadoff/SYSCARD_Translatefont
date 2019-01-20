@@ -1,0 +1,109 @@
+PC Engine System Card Translation Font Extension
+------------------------------------------------
+
+This is an extension to the PC Engine System Card (specifically, the
+Super System Card version 3.0), which implements narrow fonts of ASCII
+characters, in support of translations of CD-ROM-based games.
+
+One portion of a translation project includes making adjustments to the
+print function; most games use either 12x12 or 16x16 Japanese fonts, and
+print to tile-based graphics after obtaining the graphic representation of
+the character from the EX_GETFNT function at $E060 in the System Card.
+
+Simply riding on top of this function for English translation (as an example)
+is both impractical and hideous.  The 12x12 and 16x16 fonts in the Super
+System Card are inconsistent (for example, upper and lower-case characters
+have different baselines), and these widths take up too much screen space for
+printing an English version of text.
+
+Furthermore, re-implementing a print function and associated 8-pixel-wide font
+takes up more memory space than is often available, making such translations
+problematic.
+
+This modification acts as an extension to the exsiting EX_GETFNT function, to
+dramatically streamline such a print function modification.
+
+HOW IT WORKS
+------------
+The calling convention for EX_GETFNT is as follows:
+1) Place the output pixel-buffer address into locations $FA/$FB in zero-page  
+2) Place the 2-byte SJIS character value in ZP @ $F8/F9 (LSB first)
+3) Set $FF in ZP to one of:
+   0 = 16x16 font
+   1 = 12x12 font
+
+The calling program would need to manage how the pixel-buffer maps to either
+character-tiles (native 8-pix wide) or sprites (native 16-pix wide).
+Generally, character-tiles are used, and the print function manages the
+half-tile adjustment in the case of 12x12 charcaters. 
+ 
+ 
+In this modification, the goal was to implement an extension which would cause
+the least amount of disruption to the calling function, and yet satisify the
+translator's other requirements:
+- use of ASCII for 1-byte character text
+- font is included in the system card, not the game
+- as little as possible adjustment to the print function
+
+To this end, the adjusted calling parameters for EX_GETFNT are:
+1) Place the output pixel-buffer address into locations $FA/$FB in zero-page
+   (**SAME AS BEFORE**)
+  
+2) Place the 2-byte SJIS character value in ZP @ $F8/F9 (LSB first)
+   Or, the ASCII character is passed in ZP $F9  (**NEW**)
+   (Note: Even in an SJIS script, this value would be loaded first; now, a
+    simple ASCII range check can determine which font set to use)
+
+3) Set $FF in ZP to one of:
+   0 = 16x16 font (SJIS only)
+   1 = 12x12 font (SJIS only)
+   2 =  8x16 font (ASCII only)  (**NEW**)
+   3 =  8x12 font (ASCII only)  (**NEW**)
+
+
+ADDITIONAL
+----------
+Of course, using these functions on an unmodified Ssytem Card won't work.
+So, I have also provided an easy way for programs to check whether these font
+functions are implemented:  A string 'NUFONT' is now stored at $FFAA in
+bank 0 (virtually always mapped from $E000 to $FFFF).  It should be
+sufficient to check that $FFAA and $FFAB contain 'N' and 'U' respectively,
+and this check can conveniently be added to Super System Cards where the
+game verifies that the appropriate version card is being used.
+ 
+Note: I have left the EV_GETVER (version check) function unmodified, in case
+any software checks for too speicifc a value.
+
+
+
+WORKS ON
+--------
+This patch works on System Card 3.0 from either USA or Japan, and can also be
+layered on top of elmer's (John Brandwood) TED System Card modifications.
+
+The expectation of course, is that you have the appropriate target hardware to
+use a modified system card:
+- emulator
+- Turbo Everdrive (or similar flash cart)
+- or a CD emulator which implements cartridge emulation as well
+
+
+ABOUT THE FONTS
+---------------
+John Brandwood (elmer) contributed the fonts included here, which cover 8x12
+and 8x16 for the ASCII characters from 0x20 (space) to 0x7F (DEL).
+
+(Suggested additions for future versions may include accented European
+characters, and/or a non-fixed-width charcater set).
+
+Included are representations in:
+- .bin - binary (required for the generation of the code)
+- .fon - font definition files for use with fony
+         ( http://hukka.ncn.fi/index.php?fony )
+- .bmp - graphic representation (convert between BMP and bin by using feidian
+         by Derrick Sobodash) 
+
+
+
+2019/01/19
+Dave Shadoff
