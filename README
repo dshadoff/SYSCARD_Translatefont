@@ -1,5 +1,5 @@
-PC Engine System Card Translation Font Extension
-------------------------------------------------
+PC Engine System Card Translation Font Extension (ver 1.0)
+----------------------------------------------------------
 
 This is an extension to the PC Engine System Card (specifically, the
 Super System Card version 3.0), which implements narrow fonts of ASCII
@@ -22,6 +22,26 @@ problematic.
 
 This modification acts as an extension to the exsiting EX_GETFNT function, to
 dramatically streamline such a print function modification.
+
+
+HOW TO APPLY
+------------
+This patch is supplied as an IPS file; IPS patches are supplied for both
+American and Japanese System 3.0 cards, for images without headers. Please
+use an appropriate IPS file patcher to apply the patch.
+
+The IPS patches have been constructed in a way that they can also be layered
+on top of the "TED 2" patches created by elmer (John Brandwood), so that the
+Turbo Everdrive card enables additional RAM, and ensures that bus conflicts
+between Duo RAM and Turbo Everdrive RAM do not occur (as they won't both be
+enabled simultaneously).
+
+The expectation of course, is that you have the appropriate target hardware to
+use a modified system card:
+- emulator
+- Turbo Everdrive (or similar flash cart)
+- or a CD emulator which implements cartridge emulation as well
+
 
 HOW IT WORKS
 ------------
@@ -74,18 +94,6 @@ game verifies that the appropriate version card is being used.
 Note: I have left the EV_GETVER (version check) function unmodified, in case
 any software checks for too speicifc a value.
 
-
-
-WORKS ON
---------
-This patch works on System Card 3.0 from either USA or Japan, and can also be
-layered on top of elmer's (John Brandwood) TED System Card modifications.
-
-The expectation of course, is that you have the appropriate target hardware to
-use a modified system card:
-- emulator
-- Turbo Everdrive (or similar flash cart)
-- or a CD emulator which implements cartridge emulation as well
 
 
 ABOUT THE FONTS
